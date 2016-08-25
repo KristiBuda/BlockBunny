@@ -61,11 +61,69 @@ public class Play extends GameState {
         world.setContactListener(cl);
         b2dr = new Box2DDebugRenderer();
 
-        //create player
-        createPlayer();
+        BodyDef bdef = new BodyDef();
+        FixtureDef fixtureDef = new FixtureDef();
+        PolygonShape shape = new PolygonShape();
 
-        //create tiles
-        createTiles();
+//        //create platform box (DEFINE THE BODY)
+//        BodyDef bdef = new BodyDef();
+//        bdef.position.set(160 / PPM, 120 / PPM);
+//        bdef.type = BodyDef.BodyType.StaticBody;//-> they dont move at all
+//        //dynamic body - get affected by firces
+//        //kinematic body- dont get affected by body forces but you can set their forces(moving platform)
+//
+//        //CREATING THE BODY
+//        Body body = world.createBody(bdef);
+//
+//
+//        //set property of the fixture
+//        //set the shape of the fixture
+//        PolygonShape shape = new PolygonShape();
+//
+//        //shape is half width and half height so box would be 100 and 10
+//        shape.setAsBox(50 / PPM, 5 / PPM);
+//
+//        //to create actual objects you have to define/create fiztures
+//        FixtureDef fixtureDef = new FixtureDef();
+//
+//        fixtureDef.shape = shape;
+//
+//        //setting the category for platform
+//        fixtureDef.filter.categoryBits = B2DVars.BIT_GROUND;
+//
+//        //allowing ground to collide with box
+//        fixtureDef.filter.maskBits = B2DVars.BIT_PLAYER;
+//
+//        //define which fixture is which
+//        body.createFixture(fixtureDef).setUserData("ground");
+
+
+        //create falling player
+        bdef.position.set(160 / PPM, 200 / PPM);
+        bdef.type = BodyDef.BodyType.DynamicBody;
+        playerBody = world.createBody(bdef);
+
+        shape.setAsBox(5 / PPM, 5 / PPM);
+        fixtureDef.shape = shape;
+        fixtureDef.restitution = 0;  //Elasticity of the object 1->Very Bouncy
+
+
+        fixtureDef.filter.categoryBits = B2DVars.BIT_PLAYER;
+        fixtureDef.filter.maskBits = B2DVars.BIT_RED;
+        playerBody.createFixture(fixtureDef).setUserData("player");
+
+        //create foot sensor
+        shape.setAsBox(2 / PPM, 2 / PPM, new Vector2(0, -5 / PPM), 0);
+        fixtureDef.shape = shape;
+        fixtureDef.filter.categoryBits = B2DVars.BIT_PLAYER;
+        fixtureDef.filter.maskBits = B2DVars.BIT_RED;
+
+
+
+        //sensor fixture (footfixture) detects collision but doesn't handle it and you can travel through it.
+        fixtureDef.isSensor = true;
+
+        playerBody.createFixture(fixtureDef).setUserData("foot");
 
         //BOX2D USES MKS UNITS Meters Kilograms Seconds 1 pixel = 1 meter;
         //we have to change the ratio so 100p have to be 1 meter;
@@ -79,11 +137,46 @@ public class Play extends GameState {
         tiledMapRenderer = new OrthogonalTiledMapRenderer(tiledMap);
 
         //reading the tile layers
-        TiledMapTileLayer layer = (TiledMapTileLayer) tiledMap.getLayers().get("red");
-        tilesize = layer.getTileHeight();
+        TiledMapTileLayer redlayer = (TiledMapTileLayer) tiledMap.getLayers().get("red");
+        tilesize = redlayer.getTileHeight();
+
+        //row -> Y axis
+        //col -> X axis
+        //Go through all the cells in the layer to create box2D bodies;
+        for (int row = 0; row < redlayer.getHeight(); row++) {
+            for (int col = 0; col < redlayer.getWidth(); col++) {
+
+                //Get Cell
+                TiledMapTileLayer.Cell cell = redlayer.getCell(col, row);
+
+                //check if cell exists
+                if (cell == null) continue;
+                if (cell.getTile() == null) continue;
+
+                //cell found create a body and a fixture
+                bdef.type = BodyDef.BodyType.StaticBody;
+                bdef.position.set((col + 0.5f) * tilesize / PPM, (row + 0.5f) * tilesize / PPM);
+
+                ChainShape chainShape = new ChainShape();
+
+                Vector2[] v = new Vector2[3];
+
+                v[0] = new Vector2(-tilesize / 2 / PPM, -tilesize / 2 / PPM);
+                v[1] = new Vector2(-tilesize / 2 / PPM, tilesize / 2 / PPM);
+                v[2] = new Vector2(tilesize / 2 / PPM, tilesize / 2 / PPM);
+                chainShape.createChain(v);
+                fixtureDef.friction = 0;
+                fixtureDef.shape = chainShape;
+                fixtureDef.filter.categoryBits = B2DVars.BIT_RED;
+                fixtureDef.filter.maskBits = B2DVars.BIT_PLAYER;
+                fixtureDef.isSensor = false;
+                world.createBody(bdef).createFixture(fixtureDef);
+            }
+        }
 
     }
-    
+
+
     public void handleInput() {
 
         //player jump
@@ -127,93 +220,6 @@ public class Play extends GameState {
     public void dispose() {
     }
 
-    private void createPlayer() {
-
-        BodyDef bdef = new BodyDef();
-        FixtureDef fixtureDef = new FixtureDef();
-        PolygonShape shape = new PolygonShape();
-
-        //create falling player
-        bdef.position.set(160 / PPM, 200 / PPM);
-        bdef.type = BodyDef.BodyType.DynamicBody;
-        playerBody = world.createBody(bdef);
-
-        shape.setAsBox(5 / PPM, 5 / PPM);
-        fixtureDef.shape = shape;
-        fixtureDef.restitution = 0;  //Elasticity of the object 1->Very Bouncy
-        fixtureDef.filter.categoryBits = B2DVars.BIT_PLAYER;
-        fixtureDef.filter.maskBits = B2DVars.BIT_RED;
-        playerBody.createFixture(fixtureDef).setUserData("player");
-        //create foot sensor
-        shape.setAsBox(2 / PPM, 2 / PPM, new Vector2(0, -5 / PPM), 0);
-        fixtureDef.shape = shape;
-        fixtureDef.filter.categoryBits = B2DVars.BIT_PLAYER;
-        fixtureDef.filter.maskBits = B2DVars.BIT_RED;
-        //sensor fixture (footfixture) detects collision but doesn't handle it and you can travel through it.
-        fixtureDef.isSensor = true;
-
-        playerBody.createFixture(fixtureDef).setUserData("foot");
-
-
-    }
-
-    private void createTiles() {
-
-        tiledMap = new TmxMapLoader().load("res/maps/test.tmx");
-        tiledMapRenderer = new OrthogonalTiledMapRenderer(tiledMap);
-        tilesize = (int) tiledMap.getProperties().get("tilewidth", Integer.class);
-
-        //reading the tile layers
-        TiledMapTileLayer layer;
-        layer = (TiledMapTileLayer) tiledMap.getLayers().get("red");
-        createLayer(layer, B2DVars.BIT_RED);
-
-        layer = (TiledMapTileLayer) tiledMap.getLayers().get("green");
-        createLayer(layer, B2DVars.BIT_GREEN);
-
-        layer = (TiledMapTileLayer) tiledMap.getLayers().get("blue");
-        createLayer(layer, B2DVars.BIT_BLUE);
-    }
-
-    private void createLayer(TiledMapTileLayer layer, short bits) {
-
-        BodyDef bdef = new BodyDef();
-        FixtureDef fixtureDef = new FixtureDef();
-
-        //row -> Y axis
-        //col -> X axis
-        //Go through all the cells in the layer to create box2D bodies;
-        for (int row = 0; row < layer.getHeight(); row++) {
-            for (int col = 0; col < layer.getWidth(); col++) {
-
-                //Get Cell
-                TiledMapTileLayer.Cell cell = layer.getCell(col, row);
-
-                //check if cell exists
-                if (cell == null) continue;
-                if (cell.getTile() == null) continue;
-
-                //cell found create a body and a fixture
-                bdef.type = BodyDef.BodyType.StaticBody;
-                bdef.position.set((col + 0.5f) * tilesize / PPM, (row + 0.5f) * tilesize / PPM);
-
-                ChainShape chainShape = new ChainShape();
-
-                Vector2[] v = new Vector2[3];
-
-                v[0] = new Vector2(-tilesize / 2 / PPM, -tilesize / 2 / PPM);
-                v[1] = new Vector2(-tilesize / 2 / PPM, tilesize / 2 / PPM);
-                v[2] = new Vector2(tilesize / 2 / PPM, tilesize / 2 / PPM);
-                chainShape.createChain(v);
-                fixtureDef.friction = 0;
-                fixtureDef.shape = chainShape;
-                fixtureDef.filter.categoryBits = B2DVars.BIT_RED;
-                fixtureDef.filter.maskBits = B2DVars.BIT_PLAYER;
-                fixtureDef.isSensor = false;
-                world.createBody(bdef).createFixture(fixtureDef);
-            }
-        }
-
-    }
 
 }
+

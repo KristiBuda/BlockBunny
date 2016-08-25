@@ -12,17 +12,36 @@ import com.badlogic.gdx.physics.box2d.Manifold;
 
 public class myContactListener implements ContactListener {
 
+    private int numFootContacts;
+
     //called when two fixtures collide
     public void beginContact(Contact c) {
         Fixture fa = c.getFixtureA();
         Fixture fb = c.getFixtureB();
 
-        System.out.println(fa.getUserData() + ", " + fb.getUserData());
+        if (fa.getUserData() != null && fa.getUserData().equals("foot")){
+            numFootContacts++;
+        }
+        if (fb.getUserData() != null && fb.getUserData().equals("foot")){
+            numFootContacts++;
+        }
     }
 
     //called when two fixtures are not colliding
     public void endContact(Contact c) {
+        Fixture fa = c.getFixtureA();
+        Fixture fb = c.getFixtureB();
+
+        if (fa.getUserData() != null && fa.getUserData().equals("foot")){
+            numFootContacts--;
+        }
+        if (fb.getUserData() != null && fb.getUserData().equals("foot")){
+            numFootContacts--;
+        }
     }
+
+
+    public boolean isPlayerOnGround(){ return numFootContacts > 0;}
 
 
     //collision detection

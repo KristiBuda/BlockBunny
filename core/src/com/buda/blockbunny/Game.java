@@ -6,7 +6,9 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.buda.blockbunny.Handlers.Content;
 import com.buda.blockbunny.Handlers.GameStateManager;
+import com.buda.blockbunny.Handlers.MyInput;
 import com.buda.blockbunny.Handlers.MyInputProcessor;
 
 public class Game extends ApplicationAdapter {
@@ -28,11 +30,16 @@ public class Game extends ApplicationAdapter {
 
     private GameStateManager gsm;
 
+    public static Content res;
+
     @Override
 	public void create () {
-
         //now game is using our custom made proccesor
         Gdx.input.setInputProcessor(new MyInputProcessor());
+
+        //LOADING TEXTURES WITH THE CONTENT CLASS
+//        res = new Content();
+//        res.loadTexture("res/images/bunny.png", "bunny");
 
         batch = new SpriteBatch();
         cam = new OrthographicCamera();
@@ -50,13 +57,13 @@ public class Game extends ApplicationAdapter {
             accum -= STEP;
             gsm.update(STEP);
             gsm.render();
+            MyInput.update();
         }
+
 	}
 	
 	@Override
-	public void dispose () {
-		batch.dispose();
-	}
+	public void dispose () {batch.dispose();}
 
     public SpriteBatch getBatch() {return batch;}
     public OrthographicCamera getCam() {return cam;}
