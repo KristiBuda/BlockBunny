@@ -14,4 +14,5 @@ public class B2DVars {
     public static final short BIT_RED = 2;
     public static final short BIT_GREEN = 8;
     public static final short BIT_BLUE = 16;
+    public static final short BIT_CRYSTAL = 32;
 }

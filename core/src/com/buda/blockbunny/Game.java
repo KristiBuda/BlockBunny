@@ -38,8 +38,10 @@ public class Game extends ApplicationAdapter {
         Gdx.input.setInputProcessor(new MyInputProcessor());
 
         //LOADING TEXTURES WITH THE CONTENT CLASS
-//        res = new Content();
-//        res.loadTexture("res/images/bunny.png", "bunny");
+        res = new Content();
+        res.loadTexture("res/images/bunny.png", "bunny");
+        res.loadTexture("res/images/crystal.png", "crystal");
+        res.loadTexture("res/images/hud.png", "hud");
 
         batch = new SpriteBatch();
         cam = new OrthographicCamera();

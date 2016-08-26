@@ -6,6 +6,8 @@ import static com.buda.blockbunny.Handlers.B2DVars.PPM;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.maps.MapLayer;
+import com.badlogic.gdx.maps.MapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
@@ -15,14 +17,20 @@ import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.ChainShape;
+import com.badlogic.gdx.physics.box2d.CircleShape;
+import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.utils.Array;
 import com.buda.blockbunny.Game;
 import com.buda.blockbunny.Handlers.B2DVars;
 import com.buda.blockbunny.Handlers.GameStateManager;
 import com.buda.blockbunny.Handlers.MyInput;
 import com.buda.blockbunny.Handlers.myContactListener;
+import com.buda.blockbunny.entities.Crystal;
+import com.buda.blockbunny.entities.HUD;
+import com.buda.blockbunny.entities.Player;
 
 /**
  * Created by buda on 8/24/16.
@@ -30,28 +38,35 @@ import com.buda.blockbunny.Handlers.myContactListener;
 
 public class Play extends GameState {
 
+    private boolean debug = false;
+
     private World world;
     private Box2DDebugRenderer b2dr;
 
-    //Now by dividing with ppm to solve the pixel/meter ratio problem the objects are 100 times smaller so we need a new camera
     private OrthographicCamera b2dCam;
-
-    //Make reference to the player body
-    private Body playerBody;
     private myContactListener cl;
 
     //adding the map to the game
     private TiledMap tiledMap;
+
     //drawing the map
     private OrthogonalTiledMapRenderer tiledMapRenderer;
+
+    //crate the player
+    private Player player;
+
+    //create the array of crystals
+    private Array<Crystal> crystals;
+
+    private HUD hud;
 
     //tilesize
     private float tilesize;
 
 
     public Play(GameStateManager gsm) {
-        super(gsm);
 
+        super(gsm);
         //setup box2d stuff
         //Takes two arguments (first Vector2 is the Gravity)
         // (second boolean set to true meaning that any bodies
@@ -67,48 +82,59 @@ public class Play extends GameState {
         //create tiles
         createTiles();
 
+//        //create crystals
+//        createCrystals();
+
         //BOX2D USES MKS UNITS Meters Kilograms Seconds 1 pixel = 1 meter;
         //we have to change the ratio so 100p have to be 1 meter;
         //set up box2dCam
         b2dCam = new OrthographicCamera();
         b2dCam.setToOrtho(false, Game.V_WIDTH / PPM, Game.V_HEIGHT / PPM);
-
-        //////////////////////////////////////////////////////////////////////////////////////////////
-
-        tiledMap = new TmxMapLoader().load("res/maps/test.tmx");
-        tiledMapRenderer = new OrthogonalTiledMapRenderer(tiledMap);
-
-        //reading the tile layers
-        TiledMapTileLayer layer = (TiledMapTileLayer) tiledMap.getLayers().get("red");
-        tilesize = layer.getTileHeight();
-
+        //setup hud
+        hud = new HUD(player);
     }
-    
+
     public void handleInput() {
 
         //player jump
         if (MyInput.isPressed(MyInput.BUTTON1)) {
-
             //using the ghost fixture we can determine
             // if hes on the ground or no
             // so if his on the ground we can make him jump
-
             if (cl.isPlayerOnGround()) {
-                playerBody.applyForceToCenter(0, 200, true);
+                player.getBody().applyForceToCenter(0, 250, true);
             }
         }
+        //switch block color
+        if (MyInput.isPressed(MyInput.BUTTON2)) {
+            switchBlocks();
+        }
+
 
     }
 
     public void update(float dt) {
-
         handleInput();
-
         //updating the world, velocity iteration
         // -accuracy of collision how many steps do you want to check for collison
         //setting bodys position after collision
         world.step(dt, 6, 2);
 
+//        //remove the crystals
+//        Array<Body> bodies = cl.getBodiesToRemove();
+//        for (int i = 0; i < bodies.size; i++) {
+//            Body b = bodies.get(i);
+//            crystals.removeValue((Crystal) b.getUserData(), true);
+//            world.destroyBody(bodies.get(i));
+//            player.collectCrystal();
+//        }
+//        bodies.clear();
+
+        player.update(dt);
+//        //update crystals
+//        for (int i = 0; i < crystals.size; i++) {
+//            crystals.get(i).update(dt);
+//        }
     }
 
     public void render() {
@@ -119,9 +145,29 @@ public class Play extends GameState {
         tiledMapRenderer.setView(cam);
         tiledMapRenderer.render();
 
-        //draw box2d world
-        b2dr.render(world, b2dCam.combined);
+        //set camera to follow the player
+        cam.position.set(player.getPosition().x * PPM + Game.V_WIDTH / 4, Game.V_WIDTH / 2, 0);
+        cam.update();
 
+        //draw the player
+        sb.setProjectionMatrix(cam.combined);
+        player.render(sb);
+
+//        //draw crystals
+//        for (int i = 0; i < crystals.size; i++) {
+//            crystals.get(i).render(sb);
+//        }
+
+        //darw hud
+        sb.setProjectionMatrix(hudCam.combined);
+        hud.render(sb);
+
+
+        //draw box2D debugger
+        if (debug) {
+            //draw box2d world
+            b2dr.render(world, b2dCam.combined);
+        }
     }
 
     public void dispose() {
@@ -134,27 +180,36 @@ public class Play extends GameState {
         PolygonShape shape = new PolygonShape();
 
         //create falling player
-        bdef.position.set(160 / PPM, 200 / PPM);
+        bdef.position.set(70 / PPM, 200 / PPM);
         bdef.type = BodyDef.BodyType.DynamicBody;
-        playerBody = world.createBody(bdef);
+        //bunny needs to be moving constantly to the right
+        bdef.linearVelocity.set(1, 0);
+        Body body = world.createBody(bdef);
 
-        shape.setAsBox(5 / PPM, 5 / PPM);
+        shape.setAsBox(13 / PPM, 13 / PPM);
         fixtureDef.shape = shape;
         fixtureDef.restitution = 0;  //Elasticity of the object 1->Very Bouncy
         fixtureDef.filter.categoryBits = B2DVars.BIT_PLAYER;
-        fixtureDef.filter.maskBits = B2DVars.BIT_RED;
-        playerBody.createFixture(fixtureDef).setUserData("player");
+        fixtureDef.filter.maskBits = B2DVars.BIT_RED | B2DVars.BIT_CRYSTAL;
+        body.createFixture(fixtureDef).setUserData("player");
+
         //create foot sensor
-        shape.setAsBox(2 / PPM, 2 / PPM, new Vector2(0, -5 / PPM), 0);
+        shape.setAsBox(13 / PPM, 2 / PPM, new Vector2(0, -13 / PPM), 0);
         fixtureDef.shape = shape;
         fixtureDef.filter.categoryBits = B2DVars.BIT_PLAYER;
         fixtureDef.filter.maskBits = B2DVars.BIT_RED;
-        //sensor fixture (footfixture) detects collision but doesn't handle it and you can travel through it.
+        //sensor fixture (foot fixture) detects collision but doesn't handle it and you can travel through it.
         fixtureDef.isSensor = true;
 
-        playerBody.createFixture(fixtureDef).setUserData("foot");
+        body.createFixture(fixtureDef).setUserData("foot");
 
+        //create player
+        player = new Player(body);
 
+        //we have a circular reference
+        body.setUserData(player);
+//        //get the player class
+//        player.getBody();
     }
 
     private void createTiles() {
@@ -207,7 +262,7 @@ public class Play extends GameState {
                 chainShape.createChain(v);
                 fixtureDef.friction = 0;
                 fixtureDef.shape = chainShape;
-                fixtureDef.filter.categoryBits = B2DVars.BIT_RED;
+                fixtureDef.filter.categoryBits = bits;
                 fixtureDef.filter.maskBits = B2DVars.BIT_PLAYER;
                 fixtureDef.isSensor = false;
                 world.createBody(bdef).createFixture(fixtureDef);
@@ -215,5 +270,65 @@ public class Play extends GameState {
         }
 
     }
+//
+//    private void createCrystals() {
+//        crystals = new Array<Crystal>();
+//        MapLayer layer = tiledMap.getLayers().get("crystals");
+//
+//        BodyDef bodyDef = new BodyDef();
+//        FixtureDef fixtureDef = new FixtureDef();
+//
+//        for (MapObject mo : layer.getObjects()) {
+//
+//            bodyDef.type = BodyDef.BodyType.StaticBody;
+//
+//            float x = Float.parseFloat((mo.getProperties().get("x").toString())) / PPM;
+//            float y = Float.parseFloat((mo.getProperties().get("y").toString())) / PPM;
+//
+//            bodyDef.position.set(x, y);
+//
+//            CircleShape circleShape = new CircleShape();
+//            circleShape.setRadius(8 / PPM);
+//
+//            fixtureDef.shape = circleShape;
+//            fixtureDef.isSensor = true;
+//            fixtureDef.filter.categoryBits = B2DVars.BIT_CRYSTAL;
+//            fixtureDef.filter.maskBits = B2DVars.BIT_PLAYER;
+//
+//            Body body = world.createBody(bodyDef);
+//            body.createFixture(fixtureDef).setUserData("crystal");
+//            Crystal crystal = new Crystal(body);
+//            crystals.add(crystal);
+//
+//            body.setUserData(crystals);
+//        }
+//    }
 
+    private void switchBlocks() {
+
+        Filter filter = player.getBody().getFixtureList().first().getFilterData();
+        short bits = filter.maskBits;
+
+        //switch to next color
+        if ((bits & B2DVars.BIT_RED) != 0) {
+            bits &= ~B2DVars.BIT_RED;
+            bits |= B2DVars.BIT_GREEN;
+        } else if ((bits & B2DVars.BIT_GREEN) != 0) {
+            bits &= ~B2DVars.BIT_BLUE;
+            bits |= B2DVars.BIT_GREEN;
+        } else if ((bits & B2DVars.BIT_BLUE) != 0) {
+            bits &= ~B2DVars.BIT_BLUE;
+            bits |= B2DVars.BIT_RED;
+        }
+
+        //set new mask bits for the players
+        filter.maskBits = bits;
+        player.getBody().getFixtureList().first().setFilterData(filter);
+
+        //set new mask bits for foot
+        filter = player.getBody().getFixtureList().get(1).getFilterData();
+        bits &= ~B2DVars.BIT_CRYSTAL;
+        filter.maskBits = bits;
+        player.getBody().getFixtureList().get(1).setFilterData(filter);
+    }
 }
